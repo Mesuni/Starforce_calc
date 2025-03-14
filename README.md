@@ -1,2 +1,2 @@
 # Starforce_calc
-starforce variance calculation with markov chain
+calculate starforce using markov chain
