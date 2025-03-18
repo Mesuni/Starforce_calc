@@ -1,6 +1,6 @@
 import math
 import random
-
+import numpy as np
 
 
 def cal_coff(num):
@@ -110,7 +110,10 @@ def create_transition(isbefore,anti_destroy = [] ,starcatch = [] ,is1516 = False
         p_before[36][35] = 1-0.406
 
         #25성
-        p_before[37][37] = 1
+        #p_before[37][37] = 1
+        
+        # 터짐
+        p_before[-1][12] = 1
 
 
         
@@ -191,14 +194,16 @@ def create_transition(isbefore,anti_destroy = [] ,starcatch = [] ,is1516 = False
             p_after[i][-1] = 1-p_after[i][i+1]-p_after[i][i]
 
         
-        p_after[30][30] = 1
+        #p_after[30][30] = 1
+        
+        p_after[-1][12] = 1
 
         for i in anti_destroy:
             p_after[i][i] += p_after[i][-1]
             p_after[i][-1] =0
         
         if isdestroy:
-            for i in range(15,31):
+            for i in range(15,30):
                 p_after[i][-1] = p_after[i][-1] * 0.7
                 p_after[i][i] = 1-p_after[i][i+1]-p_after[i][-1]
 
@@ -298,7 +303,7 @@ def starforce(state,transition):
 
 
 
-def create_cost(level,isbefore,mvprank = 0,ispc = False,is30per = False, is1516 = False,anti_destroy = []):
+def create_cost(level,isbefore,initial_price,mvprank = 0,ispc = False,is30per = False, is1516 = False,anti_destroy = []):
     # mvprank 0 : bronze, 1 : silver, 2 : gold, 3 : diamond, 4 : red
     # possible anti_destroy : [15,16] if isbefore else [15,16,17]
 
@@ -308,7 +313,8 @@ def create_cost(level,isbefore,mvprank = 0,ispc = False,is30per = False, is1516 
     mvptable = [0, 0.03, 0.05, 0.1, 0.1]
     mvprate = mvptable[mvprank]
     pc = 0.05
-    costlst = [0]*30
+    
+    costlst = [0]*27 if isbefore else [0] * 32
 
     if isbefore:
         for i in range(0,10):
@@ -325,6 +331,8 @@ def create_cost(level,isbefore,mvprank = 0,ispc = False,is30per = False, is1516 
             costlst[i] = 1000 + ((level**3)*(i+1)**2.7)/107
         for i in range(15,25):
             costlst[i] = 1000 + ((level**3)*(i+1)**2.7)/200
+        costlst[25] = 0
+        costlst[26] = initial_price
     
     else:
         for i in range(0,10):
@@ -353,6 +361,8 @@ def create_cost(level,isbefore,mvprank = 0,ispc = False,is30per = False, is1516 
             costlst[i] = 1000 + ((level**3)*(i+1)**2.7)/125
         for i in range(23,30):
             costlst[i] = 1000 + ((level**3)*(i+1)**2.7)/200
+        costlst[30] = 0
+        costlst[31] = initial_price
         
     
     discount = 1-(mvprate+pc) if ispc else 1-mvprate
@@ -384,7 +394,7 @@ def simulation(numofsim,start_state,end_state,initial_price,level,isbefore,
     
     end_state = (end_state,0)
 
-    cost_table = create_cost(level,isbefore=isbefore,mvprank=mvprank,ispc=ispc,is30per=is30per,is1516=is1516,anti_destroy=anti_destroy)
+    cost_table = create_cost(level,isbefore=isbefore,initial_price=initial_price,mvprank=mvprank,ispc=ispc,is30per=is30per,is1516=is1516,anti_destroy=anti_destroy)
     meso_cost = [0] * numofsim
     destroy_num = [0] * numofsim
     P_ij = create_transition(isbefore=isbefore,anti_destroy=anti_destroy,starcatch=starcatch,is1516=is1516,isdestroy=isdestroy)
@@ -404,9 +414,7 @@ def simulation(numofsim,start_state,end_state,initial_price,level,isbefore,
             
         
             if nex_state == (-1,-1):
-                cost_once += initial_price
                 destroy_once += 1
-                nex_state = (12,0)
 
             state = nex_state
 
@@ -435,13 +443,41 @@ def calc_sample_index(mesos,destroys):
     return sample_meso_mean, sample_destroy_mean, sample_meso_sigma, sample_dest_sigma
 
 
-def calc_c_f_i(initial_state,final_state):
-    pass
+def calc_c_f_i(initial_state,final_state,isbefore,initial_price):
+    C = create_cost(level = 200, initial_price=initial_price,isbefore= isbefore, is30per= True, mvprank = 0, ispc = True)
+    P = create_transition(isbefore= isbefore,anti_destroy= [], starcatch= [], is1516 = False, isdestroy= True)
+    ini = state_transform((initial_state,0),isbefore=isbefore) 
+    fin = state_transform((final_state,0),isbefore=isbefore) 
 
-def calc_c_2_f_i(initial_state,final_state):
-    c_f_i = calc_c_f_i(initial_state,final_state)
+    
+    Pminus = P-np.identity(len(P))
+    Pminus[fin] = [0 if i !=fin else 1 for i in range(len(P))]
+    C_prime = [C[state_transform((i,0),isbefore=isbefore)] for i in range(len(P)-1)] + [C[-1]]
+    C_prime[fin] = 0
 
-    pass
+    C_prime = np.array(C_prime)
+    ans = np.linalg.inv(Pminus)@(-1 * C_prime.T) 
+
+    return ans,Pminus,C_prime
+
+def constant_calc(cf,P,C):
+    P = P + np.identity(len(P))
+    T = P@cf
+    const_matrix = [c**2 + 2*c*t  for c,t in zip(C,T)]
+    return const_matrix
+
+def calc_c_2_f_i(initial_state,final_state,isbefore,initial_price):
+    c_f_i,Pminus,C_prime = calc_c_f_i(initial_state,final_state,isbefore = isbefore,initial_price=initial_price)
+    cc = constant_calc(c_f_i,Pminus,C_prime)
+
+    ini = state_transform((initial_state,0),isbefore=isbefore) 
+    fin = state_transform((final_state,0),isbefore=isbefore)
+    
+
+    cc = np.array(cc)
+    ans = np.linalg.inv(Pminus)@(-1 * cc)
+
+    return ans
 
 def calc_with_markov():
     calc_c_f_i()
