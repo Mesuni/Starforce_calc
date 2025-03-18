@@ -1,7 +1,10 @@
 import math
 import random
 
+
+
 def cal_coff(num):
+
     coff = (1 - num*1.05)/(1-num)
     return coff
 
@@ -18,7 +21,7 @@ def create_transition(isbefore,anti_destroy = [] ,starcatch = [] ,is1516 = False
 
     
     p_before = [[0 for i in range(39)]for j in range(39)]
-    p_after = [[0 for i in range(32)]for j in range(39)]
+    p_after = [[0 for i in range(32)]for j in range(32)]
 
 
     if isbefore:
@@ -31,7 +34,7 @@ def create_transition(isbefore,anti_destroy = [] ,starcatch = [] ,is1516 = False
             p_before[i][i] = 1-p_before[i][i+1]
         
         # 15성
-        p_before[15][17] = 0.03
+        p_before[15][17] = 0.3
         p_before[15][-1] = 0.021
         p_before[15][15] = 1-0.321
 
@@ -44,8 +47,8 @@ def create_transition(isbefore,anti_destroy = [] ,starcatch = [] ,is1516 = False
             p_before[i][i-2] = 1- 0.321
             
             p_before[i+1][i+3] = 0.3
-            p_before[i][-1] = 0.021
-            p_before[i][i-2] = 1- 0.321
+            p_before[i+1][-1] = 0.021
+            p_before[i+1][i-2] = 1- 0.321
             
             p_before[i+2][i+3] = 1
 
@@ -113,10 +116,17 @@ def create_transition(isbefore,anti_destroy = [] ,starcatch = [] ,is1516 = False
         
         
         for i in starcatch:
-            y = cal_coff(p_before)
-            p_before[i][i+1] = p_before[i][i+1] * 1.05
-            p_before[i][i-1] = p_before[i][i-1] * y
-            p_before[i][-1] = p_before[i][-1] * y 
+            ind,nextind,dropind = state_index(state=(i,0),isbefore=True,transition=p_before)
+            y = cal_coff(p_before[ind][nextind])
+
+            p_before[ind][nextind] = p_before[ind][nextind] * 1.05
+            p_before[ind][dropind] = p_before[ind][dropind] * y
+            p_before[ind][-1] = p_before[ind][-1] * y 
+
+        for i in anti_destroy:
+            ind,nextind,dropind = state_index(state=(i,0),isbefore=True,transition=p_before)
+            p_before[ind][dropind] += p_before[ind][-1]
+            p_before[ind][-1] =0
 
         if is1516:
             p_before[5][6] = 1
@@ -125,7 +135,7 @@ def create_transition(isbefore,anti_destroy = [] ,starcatch = [] ,is1516 = False
             p_before[10][11] = 1
             p_before[10][10] = 0
 
-            p_before[15][16] = 1
+            p_before[15][17] = 1
             p_before[15][15] = 0
             p_before[15][-1] = 0
 
@@ -134,44 +144,159 @@ def create_transition(isbefore,anti_destroy = [] ,starcatch = [] ,is1516 = False
 
         return p_before
     else:
-        for i in range(15):
-            p_after[i][i] = 0.3
-        for i in range(15,30):
-            p_after[i][i] = 0.3
-            p_after[i][-1] = 0.7
+
+        for i in range(2):
+            p_after[i][i+1] = 0.95-0.05*i
+            p_after[i][i] = 1-p_after[i][i+1]
+        for i in range(2,15):
+            p_after[i][i+1] = 1-0.05*i
+            p_after[i][i] = 1-p_after[i][i+1]
+        
+        
+        for i in range(15,17):
+            p_after[i][i+1] = 0.3
+            p_after[i][i] = 0.679
+            p_after[i][-1] = 1-p_after[i][i+1]-p_after[i][i]
+
+        for i in range(17,19):
+            p_after[i][i+1] = 0.15
+            p_after[i][i] = 0.782
+            p_after[i][-1] = 1-p_after[i][i+1]-p_after[i][i]
+
+
+        for i in range(19,20):
+            p_after[i][i+1] = 0.15
+            p_after[i][i] = 0.765
+            p_after[i][-1] = 1-p_after[i][i+1]-p_after[i][i]
+
+        for i in range(20,21):
+            p_after[i][i+1] = 0.3
+            p_after[i][i] = 0.595
+            p_after[i][-1] = 1-p_after[i][i+1]-p_after[i][i]
+
+        for i in range(21,23):
+            p_after[i][i+1] = 0.15
+            p_after[i][i] = 0.7225 - 0.0425*(i-21)
+            p_after[i][-1] = 1-p_after[i][i+1]-p_after[i][i]
+
+
+        for i in range(23,26):
+            p_after[i][i+1] = 0.1
+            p_after[i][i] = 0.72 
+            p_after[i][-1] = 1-p_after[i][i+1]-p_after[i][i]
+
+        for i in range(26,30):
+            p_after[i][i+1] = 0.07-0.02*(i-26)
+            p_after[i][i] = 0.7440 - 0.016*(i-26)
+            p_after[i][-1] = 1-p_after[i][i+1]-p_after[i][i]
+
         
         p_after[30][30] = 1
+
+        for i in anti_destroy:
+            p_after[i][i] += p_after[i][-1]
+            p_after[i][-1] =0
         
         if isdestroy:
-            p_after[16][13] = p_after[15][13] * 0.7
-            p_after[16][16] = p_after[16][16]
-            p_after[16][17] = p_after[16][17]
+            for i in range(15,31):
+                p_after[i][-1] = p_after[i][-1] * 0.7
+                p_after[i][i] = 1-p_after[i][i+1]-p_after[i][-1]
+
+        for i in starcatch:
+            y = cal_coff(p_after[i][i+1])
+            p_after[i][i+1] = p_after[i][i+1] * 1.05
+            p_after[i][i] = p_after[i][i-1] * y
+            p_after[i][-1] = p_after[i][-1] * y 
 
         return p_after
 
 
 
+def state_transform(state,isbefore):
+    # transform (,) to index
+    if isbefore:
+        notgoodcase = dict([
+                            ((15,0),15),
+                            ((15,2),16),
+                            ((19,0),25),
+                            ((20,0),26),
+                            ((20,2),27),
+                            ((24,0),36),
+                            ((25,0),37),
+                            ((-1,-1),-1),
+                            
+                            ])
 
-def starforce(state,isbefore, anti_destroy = [], is1516 = False, isdestroy = False):
+        if state in notgoodcase.keys():
+            return notgoodcase[state]
+        if state[0]<15:
+            return state[0]
+        if 15<=state[0]<=18:
+            return 3*state[0] + state[1] - 31
+        if 20<=state[0]<=23:
+            return 3*state[0] + state[1] - 35
+        
+    else:
+        if state[1] == -1:
 
-    create_transition(isbefore=isbefore,anti_destroy=anti_destroy,is1516=is1516,isdestroy=isdestroy)
+            return -1
+        else:
+            return state[0]
 
+
+def state_index(state,isbefore,transition):
+    ind = state_transform(state,isbefore = isbefore)
+    P = transition[ind]
+
+    nextposition = 0
+    dropind = ind
+    for e, prob in enumerate(P[:-1]):
+        if prob and e<ind:
+            dropind = e
+        if prob and e>ind:
+            nextposition = e
+
+    return ind,nextposition,dropind
+
+def starforce(state,transition):
+
+    P_ij = transition
+
+    if len(P_ij) == 39:
+        isbefore = True
+    else:
+        isbefore = False
 
     if state[1] == 2:
         return (state[0]+1,0)
-
-    s = random.random(0,10)
+    if state[1] == -1:
+        return (12,0)
     
-    if s>1: # 성공
+    ind = state_transform(state=state,isbefore=isbefore)
+
+    drop = False
+
+    nextposition = 0
+    for e, prob in enumerate(P_ij[ind][:-1]):
+        if prob and e<ind:
+            drop = True
+        if prob and e>ind:
+            nextposition = e
+    
+    success, destroy = P_ij[ind][nextposition] , P_ij[ind][-1]
+    fail = 1-(success+destroy)
+    s = random.random()
+    if s<success:
         return (state[0]+1,0)
-    if s<1: # 실패
-        if state[0] <=15:
-            return state
+    elif s<success + fail:
+        if drop:
+            return (state[0]-1,state[1] + 1)
         else:
-            return (state[0]-1,(state[1]+1)%3)
-        
-    if s==0: # 파괴
-        return (12,2)
+            return (state[0],state[1])
+    else:
+        return (-1,-1)
+
+
 
 def create_cost(level,isbefore,mvprank = 0,ispc = False,is30per = False, is1516 = False,anti_destroy = []):
     # mvprank 0 : bronze, 1 : silver, 2 : gold, 3 : diamond, 4 : red
@@ -183,11 +308,11 @@ def create_cost(level,isbefore,mvprank = 0,ispc = False,is30per = False, is1516 
     mvptable = [0, 0.03, 0.05, 0.1, 0.1]
     mvprate = mvptable[mvprank]
     pc = 0.05
-    costlst = [0]*29
+    costlst = [0]*30
 
     if isbefore:
         for i in range(0,10):
-            costlst[i] = 1000 + ((level**3)*(i+1)**2.7)/36
+            costlst[i] = 1000 + ((level**3)*(i+1))/36
         for i in range(10,11):
             costlst[i] = 1000 + ((level**3)*(i+1)**2.7)/571
         for i in range(11,12):
@@ -203,7 +328,7 @@ def create_cost(level,isbefore,mvprank = 0,ispc = False,is30per = False, is1516 
     
     else:
         for i in range(0,10):
-            costlst[i] = 1000 + ((level**3)*(i+1)**2.7)/36
+            costlst[i] = 1000 + ((level**3)*(i+1))/36
         for i in range(10,11):
             costlst[i] = 1000 + ((level**3)*(i+1)**2.7)/571
         for i in range(11,12):
@@ -231,9 +356,9 @@ def create_cost(level,isbefore,mvprank = 0,ispc = False,is30per = False, is1516 
         
     
     discount = 1-(mvprate+pc) if ispc else 1-mvprate
-    anti_destroy_cost = [ (i,costlst[i]) for i in anti_destroy]
+    anti_destroy_cost = [ (i,round(costlst[i],-2)) for i in anti_destroy]
 
-    costlst = costlst * discount * 0.7 if is30per else costlst * discount
+    costlst = [round(i * discount * 0.7,-2) for i in costlst] if is30per else [round(i * discount,-2) for i in costlst]
 
     for i,cost in anti_destroy_cost:
         if isbefore:
@@ -242,39 +367,52 @@ def create_cost(level,isbefore,mvprank = 0,ispc = False,is30per = False, is1516 
             costlst[i] += cost
         else: 
             costlst[i] += 2*cost
-    
+
     return costlst
 
 def simulation(numofsim,start_state,end_state,initial_price,level,isbefore,
                mvprank = 0,ispc = False,is30per = False,is1516 = False ,isdestroy = False,
-               anti_destroy = [],isshining = False):
+               anti_destroy = [],starcatch = [],isshining = False):
 
+    # mvprank 0 : bronze, 1 : silver, 2 : gold, 3 : diamond, 4 : red
+    # possible anti_destroy : [15,16] if isbefore else [15,16,17]
     if isshining:
         is30per = True
         is1516 = True
         isdestroy = True
+    
+    
+    end_state = (end_state,0)
 
     cost_table = create_cost(level,isbefore=isbefore,mvprank=mvprank,ispc=ispc,is30per=is30per,is1516=is1516,anti_destroy=anti_destroy)
     meso_cost = [0] * numofsim
     destroy_num = [0] * numofsim
-    
+    P_ij = create_transition(isbefore=isbefore,anti_destroy=anti_destroy,starcatch=starcatch,is1516=is1516,isdestroy=isdestroy)
 
-    for i in numofsim:
+
+    for i in range(numofsim):
         cost_once = 0
         destroy_once = 0
 
-        state = start_state,0
-
-        while state != end_state:
-
-            nex_state = starforce(state,is1516=is1516,isdestroy=isdestroy)
-            cost_once += cost_table(state[0])
         
-            if nex_state == (12,2):
+        state = (start_state,0)
+
+        while True:
+
+            nex_state = starforce(state,transition=P_ij)
+            cost_once += cost_table[state[0]]
+            
+        
+            if nex_state == (-1,-1):
                 cost_once += initial_price
                 destroy_once += 1
+                nex_state = (12,0)
 
             state = nex_state
+
+            if state == end_state:
+
+                break
         meso_cost[i] = cost_once
         destroy_num[i] = destroy_once
     return meso_cost, destroy_num
